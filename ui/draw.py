@@ -108,6 +108,31 @@ def draw_game(app):
         # label
         app.canvas.create_text(cx, cy, text=label, font=app.ft_big, fill=THEME["text"])
 
+        progress = 1.0 - min(max(err, 0.0), 30) / 30
+        progress = max(0.0, min(1.0, progress))
+
+        # dimensões da barra: largura relativa ao painel esquerdo, posicionada abaixo do círculo
+        bar_w = int(left_w * 0.75)
+        bar_h = 18
+        bar_x0 = cx - bar_w // 2
+        bar_y0 = cy + int(r * 0.9) + 80   # ligeiramente abaixo do hint area
+        bar_x1 = bar_x0 + bar_w
+        bar_y1 = bar_y0 + bar_h
+
+        # fundo da barra (track)
+        app.canvas.create_rectangle(bar_x0, bar_y0, bar_x1, bar_y1,
+                                    fill=THEME["card"], outline="")
+
+        # preenchimento proporcional
+        fill_w = int(bar_w * progress)
+        if fill_w > 0:
+            fill_color = color if (bucket is not None) else THEME["accent"]
+            app.canvas.create_rectangle(bar_x0, bar_y0, bar_x0 + fill_w, bar_y1,
+                                        fill=fill_color, outline="")
+
+        # contorno fino
+        app.canvas.create_rectangle(bar_x0, bar_y0, bar_x1, bar_y1, outline=THEME["text"], width=1)
+
         # hint
         if bucket == 0:
             hint = "Vocês acharam a distância correta! Digite o número correspondente"
@@ -318,7 +343,7 @@ def draw_game2(app):
         ["1","2","3"],
         ["4","5","6"],
         ["7","8","9"],
-        ["CLR","0","DEL"]
+        ["","0",""]
     ]
 
     for r, row in enumerate(labels):
@@ -328,5 +353,6 @@ def draw_game2(app):
             x1 = x0 + btn_w
             y1 = y0 + btn_h
             tag = f"kp_btn_{lab}"
-            app.canvas.create_rectangle(x0, y0, x1, y1, fill=THEME["card"], outline="", tags=(tag,))
-            app.canvas.create_text((x0+x1)//2, (y0+y1)//2, text=lab, font=app.ft_med, fill=THEME["text"], tags=(tag,))
+            if(lab != ""):
+                app.canvas.create_rectangle(x0, y0, x1, y1, fill=THEME["card"], outline="", tags=(tag,))
+                app.canvas.create_text((x0+x1)//2, (y0+y1)//2, text=lab, font=app.ft_med, fill=THEME["text"], tags=(tag,))
