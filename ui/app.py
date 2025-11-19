@@ -28,6 +28,10 @@ class EnigmaDuoApp:
         self._setup_game_state()
         # instancia o manager do keypad (usa self.first_secret definido em _setup_game_state)
         self.keypad = KeypadManager(self)
+        # inicializa o keypad com a sequência atual (6 dígitos) e ativa faixa do 1º jogo
+        self.keypad.set_secrets(self.secret_sequence)   # reserva e reseta estado visual
+        self.keypad.set_active_range(0, 3)              # jogo 1 => índices 0..2 (end exclusivo = 3)
+
         self.canvas.bind("<Button-1>", self._on_canvas_click)
         root.after(40, self.update_ui)
 
@@ -89,16 +93,11 @@ class EnigmaDuoApp:
 
     def _setup_game_state(self):
         self.running = True
-        # agora temos 6 algarismos secretos no total; o primeiro jogo exige os 3 primeiros
         self.secret_sequence = "000000"
         self.first_secret = self.secret_sequence[:3]
         self.second_secret = self.secret_sequence[3:6]
 
-        # keypad state (migrado para KeypadManager) — mantemos placeholders apenas por compatibilidade
-        # (KeypadManager tem sua própria keypad_input/locked)
         self.keypad_value = None
-        # feedback do keypad: tuple (type:str, until:float) — KeypadManager mantém kp_feedback
-        # segundo jogo: tentar carregar imagem (opcional)
         self.symbols_img = None
         symbols_path = os.path.join(os.path.dirname(__file__), "symbols.png")
         if os.path.exists(symbols_path):
@@ -256,7 +255,10 @@ class EnigmaDuoApp:
 
     def start_game(self):
         self.screen = 'game'
+        # ativa faixa do 1º jogo (slots 0..2)
+        self.keypad.set_active_range(0, 3)
         self.canvas.delete("all")
+
 
     def start_second_intro(self):
         self.screen = 'intro2'
@@ -267,7 +269,10 @@ class EnigmaDuoApp:
 
     def start_second_game(self):
         self.screen = 'game2'
+        # ativa faixa do 2º jogo (slots 3..5)
+        self.keypad.set_active_range(3, 6)
         self.canvas.delete("all")
+
 
     # -------- Draw delegations --------
     def draw_splash(self):
@@ -290,10 +295,17 @@ class EnigmaDuoApp:
         with sc.state_lock:
             newseq = sc.state.pop("target_digits", None)
         if newseq:
+            # garante string de 6 chars (trunca/pad com zeros se necessário)
+            newseq = str(newseq).strip()[:6].ljust(6, "0")
             print("🔐 Nova sequência recebida:", newseq)
             self.secret_sequence = newseq
             self.first_secret = newseq[:3]
-            self.keypad.set_first_secret(self.first_secret)
+            self.second_secret = newseq[3:6]
+
+            # atualiza keypad (reseta entradas/locks) e ativa faixa do 1º jogo
+            self.keypad.set_secrets(self.secret_sequence)
+            self.keypad.set_active_range(0, 3)
+
 
         # --- 2) Renderização normal da UI ---
         if self.screen == 'splash':

@@ -1,53 +1,66 @@
 # ui/keypad.py
 import time
-import threading
 import serial_comm as sc
 
 class KeypadManager:
     """
-    Gerencia estado do keypad (3 slots), lógica de verificação algarismo-a-algarismo,
-    feedback temporal e chamadas de envio serial (assíncrono).
-    Interface principal:
-      - handle_keypress(key)   # recebe '0'..'9', 'DEL', 'CLR'
-      - attributes visíveis: keypad_input (list), locked (list), kp_feedback (tuple|None), keypad_value
+    Gerencia 6 slots do teclado (0..5). Usa active_range para determinar
+    onde o jogador pode digitar (por exemplo 0..3 para jogo 1, 3..6 para jogo 2).
     """
 
-class KeypadManager:
     def __init__(self, app):
         self.app = app
-        self.keypad_input = ['','','']
-        self.locked = [False, False, False]
+        # 6 slots (inicialmente vazios)
+        self.keypad_input = [''] * 6
+        self.locked = [False] * 6
+        self.kp_feedback = None
+        self.keypad_value = None  # opcional
+        # secrets: lista de 6 caracteres (strings) que representam a senha recebida via serial
+        self.secrets = ['0'] * 6
+        # intervalo ativo [start, end) — indices onde o jogador pode digitar
+        self.active_start = 0
+        self.active_end = 3
+
+    # setar os 6 dígitos da sequência (string ou iterável com 6 chars)
+    def set_secrets(self, secret6):
+        s = str(secret6)
+        s = s.strip()
+        if len(s) < 6:
+            s = s.ljust(6, '0')
+        self.secrets = list(s[:6])
+        # reseta estado de digitação ao receber nova sequência
+        self.keypad_input = [''] * 6
+        self.locked = [False] * 6
         self.kp_feedback = None
         self.keypad_value = None
 
-    def set_first_secret(self, seq3):
-        self.app.first_secret = seq3
-        self.keypad_input = ['','','']
-        self.locked = [False, False, False]
+    # define intervalo ativo [start, end) — start inclusive, end exclusive
+    def set_active_range(self, start, end):
+        assert 0 <= start <= end <= 6
+        self.active_start = start
+        self.active_end = end
+        # opcional: ao mudar de intervalo, não limpamos slots anteriores (eles permanecem)
+        # mas garantir que não haverá escrita fora do intervalo
+        # limpa feedback temporário
         self.kp_feedback = None
-        self.keypad_value = None
 
     def _update_keypad_value(self):
         s = ''.join(self.keypad_input)
-        if '' not in self.keypad_input:
-            try:
+        try:
+            # mantém None até que TODOS os 6 estejam preenchidos; adaptável se quiser outro comportamento
+            if '' not in self.keypad_input:
                 self.keypad_value = int(s)
-            except:
+            else:
                 self.keypad_value = None
-        else:
+        except:
             self.keypad_value = None
 
     def handle_keypress(self, key):
-        """
-        Processa tecla do keypad: '0'..'9', 'DEL', 'CLR'.
-        Mantém lógica idêntica ao monolítico: checagem contra app.first_secret,
-        trava dígitos corretos e avança para intro2 quando completo.
-        """
         now = time.time()
 
-        # DEL: remove o último dígito não-locked (se houver)
+        # DEL: remove o último dígito não-locked dentro do intervalo ativo (procura do fim para o início)
         if key == "DEL":
-            for i in range(len(self.keypad_input)-1, -1, -1):
+            for i in range(self.active_end - 1, self.active_start - 1, -1):
                 if self.keypad_input[i] != '' and not self.locked[i]:
                     self.keypad_input[i] = ''
                     self.kp_feedback = ("neutral", now + 0.25)
@@ -55,10 +68,10 @@ class KeypadManager:
                     return
             return
 
-        # CLR: limpa apenas os slots não-locked
+        # CLR: limpa apenas os slots não-locked dentro do intervalo ativo
         if key == "CLR":
             changed = False
-            for i in range(len(self.keypad_input)):
+            for i in range(self.active_start, self.active_end):
                 if not self.locked[i] and self.keypad_input[i] != '':
                     self.keypad_input[i] = ''
                     changed = True
@@ -69,24 +82,24 @@ class KeypadManager:
 
         # dígito
         if key.isdigit():
-            # encontra primeiro slot vazio (''), que também não deve estar locked
+            # encontra primeiro slot vazio dentro do intervalo ativo
             idx = None
-            for i in range(len(self.keypad_input)):
+            for i in range(self.active_start, self.active_end):
                 if self.keypad_input[i] == '' and not self.locked[i]:
                     idx = i
                     break
             if idx is None:
-                # nenhum slot disponível
+                # nenhum slot disponível no intervalo
                 return
 
-            expected_digit = self.app.first_secret[idx]  # compara com os 3 primeiros dígitos
+            expected_digit = self.secrets[idx]  # compara com o segredo completo (6 dígitos)
 
-            # coloca temporariamente para feedback visual
+            # escreve temporariamente para feedback visual
             self.keypad_input[idx] = key
             self._update_keypad_value()
 
             if key == expected_digit:
-                # dígito correto: marca locked e envia 0xFF
+                # acerto
                 self.locked[idx] = True
                 self.kp_feedback = ("success", now + 0.35)
                 try:
@@ -94,34 +107,39 @@ class KeypadManager:
                 except Exception as e:
                     print("[TX] Erro ao iniciar envio async (correct):", e)
 
-                # se todos os três estão locked -> sequência completa
-                if all(self.locked):
+                # se todos os do intervalo estiverem locked -> avanço
+                all_locked = all(self.locked[i] for i in range(self.active_start, self.active_end))
+                if all_locked:
                     self.kp_feedback = ("sequence_ok", now + 1.0)
-                    # daqui a 1s vamos para a introdução do segundo jogo (usa app.root.after)
-                    self.app.root.after(800, self.app.start_second_intro)
+                    # se era o primeiro bloco (0..3) -> manda para intro 2
+                    if self.active_start == 0 and self.active_end == 3:
+                        # aguarda um instante e avança
+                        self.app.root.after(800, self.app.start_second_intro)
+                    else:
+                        # se era o segundo bloco (3..6) -> jogo 2 concluído; você pode adicionar callback
+                        # por enquanto apenas limpa/mostra sucesso
+                        pass
                 return
             else:
-                # dígito incorreto: sinaliza, envia 0x00 e remove o dígito após curto delay
+                # erro -> sinaliza e remove após delay curto
                 self.kp_feedback = ("error", now + 0.45)
                 try:
                     sc.send_result_async(False)
                 except Exception as e:
                     print("[TX] Erro ao iniciar envio async (incorrect):", e)
 
-                # usar after para remover o dígito (evita manipular estado desde outra thread)
                 def remove_bad_slot(i=idx):
                     if 0 <= i < len(self.keypad_input) and not self.locked[i]:
                         self.keypad_input[i] = ''
                         self._update_keypad_value()
-                # manter o mesmo timing: 180 ms
                 self.app.root.after(180, remove_bad_slot)
                 return
 
-    # util para testes/integração: permite obter texto do display
+    # util para draw
     def display_text(self):
+        # retorna os 6 dígitos (poderia formatar com espaços se quiser)
         return ''.join(self.keypad_input)
 
-    # facilita acesso de draw: expõe propriedades
     def get_state_snapshot(self):
         return {
             "keypad_input": list(self.keypad_input),

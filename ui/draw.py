@@ -282,12 +282,34 @@ def draw_game2(app):
     display_y0 = block_y0
     display_y1 = display_y0 + display_h
 
+    # display (campo de entrada) - mostra todos os dígitos (6)
     app.canvas.create_rectangle(display_x0, display_y0, display_x1, display_y1,
                                  fill=THEME["bg"], outline=THEME["card"])
     display_text = ''.join(app.keypad.keypad_input)
     app.canvas.create_text((display_x0+display_x1)//2, display_y0 + display_h//2,
                             text=display_text, font=app.ft_big, fill=THEME["accent"])
 
+    # --- agora renderizar feedbacks (success/error/sequence_ok) igual ao jogo 1 ---
+    if app.keypad.kp_feedback:
+        ftype, until = app.keypad.kp_feedback
+        if time.time() < until:
+            if ftype == "success":
+                # pequeno indicador verde no canto direito do display
+                cx_fb = display_x1 - 24
+                cy_fb = display_y0 + display_h//2
+                app.canvas.create_oval(cx_fb-12, cy_fb-12, cx_fb+12, cy_fb+12, fill=THEME["success"], outline="")
+            elif ftype == "error":
+                # flash vermelho semitransparente sobre display — usando stipple
+                app.canvas.create_rectangle(display_x0, display_y0, display_x1, display_y1,
+                                             fill="#c94b4b", stipple="gray50", outline="")
+            elif ftype == "sequence_ok":
+                app.canvas.create_text(block_x_center, display_y1 - 100,
+                                        text="Senha correta!", font=app.ft_med, fill=THEME["success"])
+        else:
+            # expirar
+            app.keypad.kp_feedback = None
+
+    # grid buttons (permanece igual)
     grid_x0 = int(block_x_center - total_grid_w // 2)
     grid_y0 = display_y1 + gap_display_grid
 

@@ -50,7 +50,10 @@ class SerialReader(threading.Thread):
                 state["serial_ok"] = False
             self.ser = None
             return False
-
+        
+    def stop(self):
+        self.running = False
+        
     def run(self):
         if not self.open_serial():
             while self.running and serial is not None:
@@ -125,8 +128,6 @@ def process_frame(self, text):
         print(f"Frame inválido (ignorando): '{txt}' -> {e}")
 
 
-    def stop(self):
-        self.running = False
 
 
 # função de simulação (idêntica)
