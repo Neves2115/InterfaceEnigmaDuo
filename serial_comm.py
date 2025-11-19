@@ -105,27 +105,27 @@ class SerialReader(threading.Thread):
             pass
         print("SerialReader finalizado.")
 
-def process_frame(self, text):
-    """
-    Recebe um frame já separado pelo '#'.
-    Pode ser:
-      - "DD"   (medidas, valores inteiros)
-      - "123456"  (a nova sequência de 6 dígitos)
-    """
-    txt = text.replace('\r','').replace('\n','').strip()
+    def process_frame(self, text):
+        """
+        Recebe um frame já separado pelo '#'.
+        Pode ser:
+        - "DD"   (medidas, valores inteiros)
+        - "123456"  (a nova sequência de 6 dígitos)
+        """
+        txt = text.replace('\r','').replace('\n','').strip()
 
-    if len(txt) == 6 and txt.isdigit():
-        with state_lock:
-            state["target_digits"] = txt
-        print(f"[Serial] Sequência recebida: {txt}")
-        return 
+        if len(txt) == 6 and txt.isdigit():
+            with state_lock:
+                state["target_digits"] = txt
+            print(f"[Serial] Sequência recebida: {txt}")
+            return 
 
-    try:
-        val = int(txt)
-        with state_lock:
-            state["error"] = max(0, val)
-    except Exception as e:
-        print(f"Frame inválido (ignorando): '{txt}' -> {e}")
+        try:
+            val = int(txt)
+            with state_lock:
+                state["error"] = max(0, val)
+        except Exception as e:
+            print(f"Frame inválido (ignorando): '{txt}' -> {e}")
 
 
 

@@ -58,28 +58,6 @@ class KeypadManager:
     def handle_keypress(self, key):
         now = time.time()
 
-        # DEL: remove o último dígito não-locked dentro do intervalo ativo (procura do fim para o início)
-        if key == "DEL":
-            for i in range(self.active_end - 1, self.active_start - 1, -1):
-                if self.keypad_input[i] != '' and not self.locked[i]:
-                    self.keypad_input[i] = ''
-                    self.kp_feedback = ("neutral", now + 0.25)
-                    self._update_keypad_value()
-                    return
-            return
-
-        # CLR: limpa apenas os slots não-locked dentro do intervalo ativo
-        if key == "CLR":
-            changed = False
-            for i in range(self.active_start, self.active_end):
-                if not self.locked[i] and self.keypad_input[i] != '':
-                    self.keypad_input[i] = ''
-                    changed = True
-            if changed:
-                self.kp_feedback = ("neutral", now + 0.25)
-                self._update_keypad_value()
-            return
-
         # dígito
         if key.isdigit():
             # encontra primeiro slot vazio dentro do intervalo ativo

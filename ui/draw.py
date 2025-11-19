@@ -186,7 +186,7 @@ def draw_game(app):
         ["1","2","3"],
         ["4","5","6"],
         ["7","8","9"],
-        ["CLR","0","DEL"]
+        ["","0",""]
     ]
 
     for r, row in enumerate(labels):
@@ -196,8 +196,9 @@ def draw_game(app):
             x1 = x0 + btn_w
             y1 = y0 + btn_h
             tag = f"kp_btn_{lab}"
-            app.canvas.create_rectangle(x0, y0, x1, y1, fill=THEME["card"], outline="", tags=(tag,))
-            app.canvas.create_text((x0+x1)//2, (y0+y1)//2, text=lab, font=app.ft_med, fill=THEME["text"], tags=(tag,))
+            if(lab != ""):
+                app.canvas.create_rectangle(x0, y0, x1, y1, fill=THEME["card"], outline="", tags=(tag,))
+                app.canvas.create_text((x0+x1)//2, (y0+y1)//2, text=lab, font=app.ft_med, fill=THEME["text"], tags=(tag,))
 
 def draw_game2(app):
     app.canvas.delete("all")
