@@ -139,7 +139,7 @@ def draw_game(app):
         elif bucket == 1:
             hint = "Um leve ruído ecoa... vocês estão muito próximos."
         elif bucket == 2:
-            hint = "O ar parece vibrar... quase lá."
+            hint = "Ainda não... Tentem mover um pouco mais."
         else:
             hint = "Silêncio absoluto... nada reage."
         app.canvas.create_text(cx, cy + int(r*0.9) + 48, text=hint, font=app.ft_med, fill=THEME["hint"])

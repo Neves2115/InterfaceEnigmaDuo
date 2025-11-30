@@ -153,6 +153,8 @@ class EnigmaDuoApp:
                 threading.Thread(target=sc.simulate_sequence, daemon=True).start()
         elif key == 'q':
             self.on_close()
+        elif key == 'r':
+            self.reset()            
 
     def _on_canvas_click(self, event):
         """Detecta clique em botões do keypad desenhados no canvas."""
@@ -329,7 +331,6 @@ class EnigmaDuoApp:
         if self.running:
             self.root.after(UI_UPDATE_MS, self.update_ui)
 
-
     def on_close(self):
         self.running = False
         with sc.state_lock:
@@ -338,3 +339,50 @@ class EnigmaDuoApp:
             self.root.destroy()
         except:
             sys.exit(0)
+
+    def reset(self):
+        print("[APP] Resetando jogo...")
+        # 1) parar animações/typings ativas
+        try:
+            self.typing_running = False
+            self.typing_pos = 0
+            self.intro2_typing_running = False
+            self.intro2_typing_pos = 0
+        except Exception:
+            pass
+        # 2) voltar à tela inicial (splash)
+        self.screen = 'splash'
+        # 3) limpar/zerar a sequência e secrets locais
+        self.secret_sequence = "000000"
+        self.first_secret = self.secret_sequence[:3]
+        self.second_secret = self.secret_sequence[3:6]
+        # 4) resetar estado do keypad através da API do KeypadManager
+        # set_secrets deve resetar estado visual/entradas internas (conforme comentário anterior)
+        self.keypad.set_secrets(self.secret_sequence)
+        # reativa faixa do 1º jogo (slots 0..2) por padrão
+        self.keypad.set_active_range(0, 3)
+        # 5) limpar valores locais relacionados ao keypad / UI
+        self.keypad_value = None
+        # 6) limpar estados no serial_comm (se houver)
+        try:
+            with sc.state_lock:
+                # apagar sequência alvo pendente vindo da serial (se existir)
+                sc.state.pop("target_digits", None)
+                # limpar erro/sinal e simulação
+                sc.state["error"] = None
+                sc.state["sim_on"] = False
+        except Exception as e:
+            print("[RESET] Aviso: não foi possível limpar estado em serial_comm:", e)
+        # 7) redesenha tela inicial e garante foco
+        try:
+            self.canvas.delete("all")
+            self.draw_splash()
+        except Exception as e:
+            print("[RESET] Aviso ao redesenhar splash:", e)
+        try:
+            # devolve foco para a janela (receberá teclas novamente)
+            self.root.focus_set()
+        except Exception:
+            pass
+        print("[APP] Reset completo.")
+
