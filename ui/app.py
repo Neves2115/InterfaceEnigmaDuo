@@ -105,12 +105,70 @@ class EnigmaDuoApp:
                 self.symbols_img = Image.open(symbols_path).convert("RGBA")
             except Exception as e:
                 print("⚠️ Não foi possível carregar symbols.jpg:", e)
-
+        # --- victory image (full screen final) ---
+        self._victory_img = None
+        self._victory_photo = None
+        victory_path = os.path.join(os.path.dirname(__file__), "efe39862-ea18-4e2d-bbf3-7146a7c1d367.png")
+        if os.path.exists(victory_path):
+            try:
+                self._victory_img = Image.open(victory_path).convert("RGBA")
+            except Exception as e:
+                print("⚠️ Erro carregando victory image:", e)
+                self._victory_img = None
         self.intro2_text = (
             "Vocês decifraram um dos enigmas! Algo mudou no cofre — "
             "reparem com atenção: agora é o Enigma dos Símbolos. "
             "Uma seta apontará para símbolos; interpretem o padrão e respondam."
         )
+
+        # ---------- vidas (hearts) ----------
+        # config
+        self.max_lives = 3
+        self.lives = self.max_lives
+        self.lives_enabled = True  # pode ser toggleada com 'M'
+
+        # paths (coloque os arquivos na pasta ui/)
+        heart_full_path = os.path.join(os.path.dirname(__file__), "red-heart-love-pixel-art-icon-doodle-png.png")
+        heart_empty_path = os.path.join(os.path.dirname(__file__), "97-971526_empty-pixel-heart-pink-8-bit-heart-clipart.png")
+
+        # carregar imagens (PhotoImage) — guardamos referência em self para evitar GC
+        self._heart_full_photo = None
+        self._heart_empty_photo = None
+        try:
+            if os.path.exists(heart_full_path):
+                hf = Image.open(heart_full_path).convert("RGBA")
+                # redimensionar para um tamanho razoável (32 px de altura) — ajustável
+                base_h = 32
+                scale = base_h / hf.height
+                hf = hf.resize((int(hf.width * scale), base_h), Image.LANCZOS)
+                self._heart_full_photo = ImageTk.PhotoImage(hf)
+        except Exception as e:
+            print("⚠️ Erro carregando heart_full:", e)
+            self._heart_full_photo = None
+
+        try:
+            if os.path.exists(heart_empty_path):
+                he = Image.open(heart_empty_path).convert("RGBA")
+                base_h = 32
+                scale = base_h / he.height
+                he = he.resize((int(he.width * scale), base_h), Image.LANCZOS)
+                self._heart_empty_photo = ImageTk.PhotoImage(he)
+        except Exception as e:
+            print("⚠️ Erro carregando heart_empty:", e)
+            self._heart_empty_photo = None
+
+    def lose_life(self):
+        """Diminui uma vida (se habilitado) e imprime estado. Não faz outra ação de 'game over'."""
+        if not getattr(self, "lives_enabled", True):
+            return
+        if not hasattr(self, "lives"):
+            self.lives = getattr(self, "max_lives", 3)
+        if self.lives > 0:
+            self.lives -= 1
+            print(f"[LIVES] Vida perdida — restantes: {self.lives}/{self.max_lives}")
+        else:
+            print("[LIVES] Sem vidas restantes.")
+
 
     # ----------------- eventos / delegação para keypad -----------------
     def on_key(self, event):
@@ -146,6 +204,8 @@ class EnigmaDuoApp:
                 pass
             elif self.screen == 'game2':
                 pass
+            elif self.screen == 'victory_transition':
+                self.start_final_victory()
         elif key == 's':
             with sc.state_lock:
                 sc.state["sim_on"] = not sc.state.get("sim_on", False)
@@ -154,7 +214,13 @@ class EnigmaDuoApp:
         elif key == 'q':
             self.on_close()
         elif key == 'r':
-            self.reset()            
+            self.reset()   
+        elif key == 'm':
+            # toggle mostrar/usar vidas
+            self.lives_enabled = not getattr(self, "lives_enabled", True)
+            print(f"[LIVES] Vidas {'ativadas' if self.lives_enabled else 'desativadas'} (M)")
+            return
+         
 
     def _on_canvas_click(self, event):
         """Detecta clique em botões do keypad desenhados no canvas."""
@@ -275,6 +341,46 @@ class EnigmaDuoApp:
         self.keypad.set_active_range(3, 6)
         self.canvas.delete("all")
 
+    def start_win_transition(self):
+        """Mostra a tela curta de 'vocês conseguiram' e agenda a tela final."""
+        if getattr(self, "_in_win_transition", False):
+            return
+        self._in_win_transition = True
+        self.screen = 'victory_transition'
+
+    def start_final_victory(self):
+        """Mostra a imagem final ocupando a tela inteira (estática)."""
+        self.screen = 'victory_final'
+        # prepara PhotoImage escalada para o canvas atual
+        try:
+            if getattr(self, "_victory_img", None):
+                cw = self.canvas.winfo_width()
+                ch = self.canvas.winfo_height()
+                img = self._victory_img.copy()
+                # mantém aspecto e cobre a tela (crop center)
+                img_ratio = img.width / img.height
+                canvas_ratio = cw / ch if ch > 0 else 1.0
+                if img_ratio > canvas_ratio:
+                    # imagem mais larga -> ajustar altura
+                    new_h = ch
+                    new_w = int(img_ratio * new_h)
+                else:
+                    new_w = cw
+                    new_h = int(new_w / img_ratio)
+                resized = img.resize((max(1, new_w), max(1, new_h)), Image.LANCZOS)
+                left = (new_w - cw)//2
+                top  = (new_h - ch)//2
+                cropped = resized.crop((left, top, left + cw, top + ch))
+                self._victory_photo = ImageTk.PhotoImage(cropped)
+        except Exception as e:
+            print("[VICTORY] erro preparando imagem:", e)
+            self._victory_photo = None
+        # draw será chamado pelo update_ui (ou você pode forçar redraw)
+        try:
+            self.canvas.delete("all")
+        except:
+            pass
+
 
     # -------- Draw delegations --------
     def draw_splash(self):
@@ -292,8 +398,13 @@ class EnigmaDuoApp:
     def draw_game2(self):
         draw.draw_game2(self)
 
+    def draw_game_over(self):
+        draw.draw_game_over(self)
+    
+
     # -------- Update loop --------
     def update_ui(self):
+        # checa se nova sequência chegou via serial_comm
         with sc.state_lock:
             newseq = sc.state.pop("target_digits", None)
         if newseq:
@@ -308,8 +419,18 @@ class EnigmaDuoApp:
             self.keypad.set_secrets(self.secret_sequence)
             self.keypad.set_active_range(0, 3)
 
+        # --- Verificar condição de Game Over por vidas ---
+        # Se vidas estão habilitadas e chegaram a zero, passamos a tela para 'game_over'
+        if getattr(self, "lives_enabled", False) and getattr(self, "lives", 1) <= 0:
+            if self.screen not in ('game_over', 'splash'):
+                # coloca na tela de game over
+                self.screen = 'game_over'
+                # limpa canvas para evitar sobreposição momentânea
+                try:
+                    self.canvas.delete("all")
+                except:
+                    pass
 
-        # --- 2) Renderização normal da UI ---
         if self.screen == 'splash':
             self.draw_splash()
 
@@ -327,9 +448,23 @@ class EnigmaDuoApp:
         elif self.screen == 'game2':
             self.draw_game2()
 
+        elif self.screen == 'game_over':
+            # desenha a tela simples de "tentar novamente"
+            self.draw_game_over()
+        elif self.screen == 'game2':
+            self.draw_game2()
+
+        elif self.screen == 'victory_transition':
+            # desenha tela de transição (mensagem)
+            draw.draw_victory_transition(self)
+
+        elif self.screen == 'victory_final':
+            draw.draw_final_victory(self)
+
         # --- 3) Loop contínuo ---
         if self.running:
             self.root.after(UI_UPDATE_MS, self.update_ui)
+
 
     def on_close(self):
         self.running = False
@@ -348,6 +483,12 @@ class EnigmaDuoApp:
             self.typing_pos = 0
             self.intro2_typing_running = False
             self.intro2_typing_pos = 0
+        except Exception:
+            pass
+        # resetar vidas
+        try:
+            self.lives = self.max_lives
+            self.lives_enabled = True
         except Exception:
             pass
         # 2) voltar à tela inicial (splash)

@@ -73,6 +73,27 @@ def draw_game(app):
     app.canvas.create_text(20, header_h//2, anchor="w",
                             text=status_text, font=app.ft_small, fill=THEME["text"])
 
+    heart_h = 32
+    spacing = 8
+    margin_right = 16
+    # calc posição inicial (lado direito)
+    # desenhar com base na largura 'w'
+    total_w = (heart_h * getattr(app, "max_lives", 3)) + spacing * (getattr(app, "max_lives", 3) - 1)
+    start_x = w - margin_right - (heart_h // 2) - total_w + (heart_h // 2)
+    y = header_h // 2
+
+    for i in range(getattr(app, "max_lives", 3)):
+        x = start_x + i * (heart_h + spacing)
+        # escolher imagem preenchida ou vazia
+        if hasattr(app, "lives") and i < getattr(app, "lives", 0):
+            # filled
+            if getattr(app, "_heart_full_photo", None):
+                app.canvas.create_image(x, y, image=app._heart_full_photo, anchor="center")
+        else:
+            # empty
+            if getattr(app, "_heart_empty_photo", None):
+                app.canvas.create_image(x, y, image=app._heart_empty_photo, anchor="center")
+
     # define área esquerda/direita
     content_y0 = header_h + 20
     content_y1 = h - 40
@@ -225,6 +246,79 @@ def draw_game(app):
                 app.canvas.create_rectangle(x0, y0, x1, y1, fill=THEME["card"], outline="", tags=(tag,))
                 app.canvas.create_text((x0+x1)//2, (y0+y1)//2, text=lab, font=app.ft_med, fill=THEME["text"], tags=(tag,))
 
+def draw_game_over(app):
+    """
+    Tela simples de Game Over / tentar novamente.
+    Mostra mensagem centralizada e dica para apertar 'R' (reset).
+    """
+    canvas = app.canvas
+    canvas.delete("all")
+
+    w = canvas.winfo_width()
+    h = canvas.winfo_height()
+    cx = w // 2
+    cy = h // 2
+
+    # painel central suave
+    panel_w = min(900, int(w * 0.8))
+    panel_h = min(300, int(h * 0.35))
+    x0 = cx - panel_w // 2
+    y0 = cy - panel_h // 2
+    x1 = cx + panel_w // 2
+    y1 = cy + panel_h // 2
+
+    canvas.create_rectangle(x0, y0, x1, y1, fill=THEME["panel"], outline=THEME["card"], width=2)
+    # título
+    canvas.create_text(cx, y0 + 100, text="Quase lá! Vamos tentar outra vez?", font=app.ft_title, fill=THEME["text"], anchor="n")
+
+    # instrução para reset
+    hint = "Aperte 'R' para tentar novamente"
+    canvas.create_text(cx, y1 - 36, text=hint, font=app.ft_med, fill=THEME["accent"])
+
+def draw_victory_transition(app):
+    canvas = app.canvas
+    canvas.delete("all")
+    w = canvas.winfo_width()
+    h = canvas.winfo_height()
+    cx = w // 2
+    cy = h // 2
+
+    panel_w = 1000
+    panel_h = 420
+    x0 = cx - panel_w // 2
+    y0 = cy - panel_h // 2
+    x1 = cx + panel_w // 2
+    y1 = cy + panel_h // 2
+
+    canvas.create_rectangle(x0, y0, x1, y1, fill=THEME["panel"], outline=THEME["card"])
+    canvas.create_text(x0 + 20, y0 + 20, anchor="w", text="Parabéns!", font=app.ft_med, fill=THEME["text"])
+    canvas.create_text(cx, cy - 20, text="Vocês conseguiram! Uma incrível recompensa os espera!", font=app.ft_game_like, width=panel_w-120, justify="center", fill=THEME["accent"])
+    canvas.create_text(cx, y1 - 30, text="Pressione ENTER para continuar", font=app.ft_small, fill=THEME["muted"])
+
+def draw_final_victory(app):
+    canvas = app.canvas
+    canvas.delete("all")
+    w = canvas.winfo_width()
+    h = canvas.winfo_height()
+
+    # Se já carregamos antes, redimensionamos
+    if getattr(app, "_victory_img", None):
+        img = app._victory_img
+
+        # FORÇAR imagem a ocupar 100% da tela
+        resized = img.resize((w, h), Image.LANCZOS)
+        app._victory_photo = ImageTk.PhotoImage(resized)
+
+        # Centralizar (como a imagem tem exatamente w×h, não importa o anchor)
+        canvas.create_image(0, 0, image=app._victory_photo, anchor="nw")
+        return
+
+    # fallback (caso a imagem não carregue)
+    canvas.create_text(w//2, h//2, text="VOCÊS CONSEGUIRAM!",
+                       font=app.ft_big, fill="white")
+
+
+
 def draw_game2(app):
     app.canvas.delete("all")
     w = app.canvas.winfo_width()
@@ -236,6 +330,26 @@ def draw_game2(app):
     status_text = f"Porta: {PORT}  |  Conexão: {'OK' if sc.state.get('serial_ok') else 'NÃO'}"
     app.canvas.create_text(20, header_h//2, anchor="w",
                             text=status_text, font=app.ft_small, fill=THEME["text"])
+    heart_h = 32
+    spacing = 8
+    margin_right = 16
+    # calc posição inicial (lado direito)
+    # desenhar com base na largura 'w'
+    total_w = (heart_h * getattr(app, "max_lives", 3)) + spacing * (getattr(app, "max_lives", 3) - 1)
+    start_x = w - margin_right - (heart_h // 2) - total_w + (heart_h // 2)
+    y = header_h // 2
+
+    for i in range(getattr(app, "max_lives", 3)):
+        x = start_x + i * (heart_h + spacing)
+        # escolher imagem preenchida ou vazia
+        if hasattr(app, "lives") and i < getattr(app, "lives", 0):
+            # filled
+            if getattr(app, "_heart_full_photo", None):
+                app.canvas.create_image(x, y, image=app._heart_full_photo, anchor="center")
+        else:
+            # empty
+            if getattr(app, "_heart_empty_photo", None):
+                app.canvas.create_image(x, y, image=app._heart_empty_photo, anchor="center")
 
     # define área esquerda/direita
     content_y0 = header_h + 20
@@ -356,3 +470,4 @@ def draw_game2(app):
             if(lab != ""):
                 app.canvas.create_rectangle(x0, y0, x1, y1, fill=THEME["card"], outline="", tags=(tag,))
                 app.canvas.create_text((x0+x1)//2, (y0+y1)//2, text=lab, font=app.ft_med, fill=THEME["text"], tags=(tag,))
+

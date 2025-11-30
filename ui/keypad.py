@@ -124,6 +124,11 @@ class KeypadManager:
                         sc.send_result_async(False)
                     except Exception as e:
                         print("[TX] Erro ao iniciar envio async (incorrect):", e)
+                    try:
+                        if hasattr(self.app, "lose_life"):
+                            self.app.lose_life()
+                    except Exception:
+                        pass
 
                     def remove_bad_slot(i=idx):
                         if 0 <= i < len(self.keypad_input) and not self.locked[i]:
@@ -152,7 +157,7 @@ class KeypadManager:
                         sc.send_result_async(True)
                     except Exception as e:
                         print("[TX] Erro ao iniciar envio async (correct block):", e)
-                    # aqui você pode chamar um callback / avançar para final do jogo
+                    self.app.root.after(600, self.app.start_win_transition)
                     return
                 else:
                     # erro: sinaliza, envia 0x00 e apaga os três dígitos do bloco após curto delay
@@ -161,6 +166,11 @@ class KeypadManager:
                         sc.send_result_async(False)
                     except Exception as e:
                         print("[TX] Erro ao iniciar envio async (incorrect block):", e)
+                    try:
+                        if hasattr(self.app, "lose_life"):
+                            self.app.lose_life()
+                    except Exception:
+                        pass
 
                     def clear_block():
                         for i in range(self.active_start, self.active_end):
