@@ -121,14 +121,15 @@ class KeypadManager:
                     # dígito incorreto: sinaliza, envia 0x00 e remove o dígito após curto delay
                     self.kp_feedback = ("error", now + 0.45)
                     try:
-                        sc.send_result_async(False)
+                        if getattr(self.app, "lives_enabled", False):
+                            try:
+                                self.app.lose_life()
+                            except Exception as e:
+                                print("[LIVES] Erro ao decrementar vida:", e)
+
+                            sc.send_result_async(False)
                     except Exception as e:
-                        print("[TX] Erro ao iniciar envio async (incorrect):", e)
-                    try:
-                        if hasattr(self.app, "lose_life"):
-                            self.app.lose_life()
-                    except Exception:
-                        pass
+                        print("[TX] Erro ao enviar resultado (incorrect):", e)
 
                     def remove_bad_slot(i=idx):
                         if 0 <= i < len(self.keypad_input) and not self.locked[i]:
@@ -163,14 +164,16 @@ class KeypadManager:
                     # erro: sinaliza, envia 0x00 e apaga os três dígitos do bloco após curto delay
                     self.kp_feedback = ("error", now + 0.45)
                     try:
-                        sc.send_result_async(False)
+                        if getattr(self.app, "lives_enabled", False):
+                            # decrementa vida imediatamente (ou depois, conforme preferir)
+                            try:
+                                self.app.lose_life()
+                            except Exception as e:
+                                print("[LIVES] Erro ao decrementar vida:", e)
+
+                            sc.send_result_async(False)
                     except Exception as e:
-                        print("[TX] Erro ao iniciar envio async (incorrect block):", e)
-                    try:
-                        if hasattr(self.app, "lose_life"):
-                            self.app.lose_life()
-                    except Exception:
-                        pass
+                        print("[TX] Erro ao enviar resultado (incorrect):", e)
 
                     def clear_block():
                         for i in range(self.active_start, self.active_end):
